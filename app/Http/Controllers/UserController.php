@@ -1,0 +1,145 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Hash;
+
+
+class UserController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index()
+    {
+        return view("Usuarios/index");
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        $roles = Role::all();
+        return view("Usuarios/create", compact("roles"));
+
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            "name" => ["required"],
+            "email" => ["required", "email"],
+            "pass" => ["required"],
+            "rol" => ["required"]
+            ]);
+
+            if($validator->fails()){
+                return back() -> with("errorValidator", "Los datos en el formulario no son los correctos");
+            }
+            User::create([
+                "name" => $request->nombre,
+                "email" => $request->email,
+                "password" => Hash::make($request->pass)
+
+              ])->assignRole($request->rol);
+
+              return redirect()->route("Usuarios.index")->with("status", "Usuario creado con éxito");
+
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        //
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        $usuario = User::find($id);
+        $roles = Role::all();
+        return view("Usuarios/edit", compact("usuario", "roles"));
+
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+
+        $validator = Validator::make($request->all(),[
+            "nombre" =>["requited"],
+            "email" => ['required', 'email'],
+        ]);
+
+
+        if ($validator->fails()){
+            return redirect()->route("Usuarios.index")->whith("status", "Algo falló en el formulario");
+        }
+        //1 - Leer el rol que recibe
+        $newRol = $request->rol;
+
+        // 2 - traer todos los roles existentes
+
+        $rolesDB = Role::all();
+        $rolesNames = [];
+
+        // 3 - Guardo los nombres de los roles en un arreglo.
+        foreach ($rolesDB as $rolDB){
+            $rolesNames[] = $rolDB->name;
+        }
+
+        // 4- Compruebo de que el rol que he recibido existe en el arreglo de los roles existentes
+        $rolExist = in_array($newRol, $rolesNames, true);
+
+        $usuario = User::find($id);
+        $usuario->id = $request->input('id');
+        $usuario->name = $request->input ('name');
+        $usuario->email = $request->input ('email');
+        $usuario->save();
+
+        if ($rolExist){
+            //remover los roles existentes en el usuario
+            foreach ($rolesNames as $rol){
+                $usuario->removeRole($rol);
+            }
+
+            //asigno el nuevo rol
+
+            $usuario->assignRole($newRol);
+        } else {
+            return redirect()->route("Usuarios.index", $usuario);
+        }
+        // $usuario = User::find($id);
+        // $usuario->id = $request->input('id');
+        // $usuario->name = $request->input ('name');
+        // $usuario->email = $request->input ('email');
+
+        return redirect()->route("Usuarios.index", $usuario);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        $usuario = User::find($id);
+        $usuario->delete();
+
+        return redirect()->route("Usuarios.index")->with('status', 'Usuario eliminado');
+    }
+}
